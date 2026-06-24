@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Skill(run)",
+      "Bash(start \"\" \"D:\\\\Old\\\\减数分裂\\\\meiosis.html\")",
+      "Bash(explorer \"D:\\\\Old\\\\减数分裂\\\\meiosis.html\")",
+      "Read(//d/old/减数分裂/**)",
+      "Bash(gh repo *)"
+    ]
+  }
+}

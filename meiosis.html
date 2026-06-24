@@ -1,0 +1,1460 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>减数分裂全过程可视化模型</title>
+<style>
+/* ==================== 全局样式 ==================== */
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+  background: #0a0a2e;
+  font-family: 'Microsoft YaHei', 'PingFang SC', sans-serif;
+  color: #fff;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+h1 {
+  margin-top: 15px;
+  font-size: 22px;
+  letter-spacing: 3px;
+  color: #e0e0ff;
+  text-shadow: 0 0 10px rgba(100,100,255,0.5);
+}
+
+/* ==================== 阶段信息面板 ==================== */
+#info-panel {
+  margin: 10px 0;
+  text-align: center;
+  min-height: 70px;
+}
+#stage-title {
+  font-size: 20px;
+  font-weight: bold;
+  color: #ffd700;
+  text-shadow: 0 0 8px rgba(255,215,0,0.4);
+}
+#stage-desc {
+  font-size: 13px;
+  color: #b0b0d0;
+  margin-top: 5px;
+  max-width: 700px;
+  line-height: 1.6;
+}
+
+/* ==================== Canvas 容器 ==================== */
+#canvas-wrap {
+  position: relative;
+  width: 750px;
+  height: 520px;
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 0 30px rgba(80,80,200,0.25);
+}
+canvas {
+  display: block;
+  background: #0d0d35;
+}
+
+/* ==================== 控制面板 ==================== */
+#controls {
+  margin: 12px 0 15px;
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+#controls button {
+  padding: 7px 18px;
+  font-size: 14px;
+  border: 1px solid rgba(150,150,255,0.4);
+  border-radius: 6px;
+  background: rgba(30,30,80,0.8);
+  color: #d0d0ff;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+#controls button:hover {
+  background: rgba(60,60,140,0.9);
+  border-color: rgba(180,180,255,0.7);
+  color: #fff;
+}
+#controls button:active { transform: scale(0.96); }
+#controls button.active {
+  background: rgba(80,80,200,0.9);
+  border-color: #ffd700;
+  color: #ffd700;
+}
+#progress-bar {
+  width: 750px;
+  height: 6px;
+  background: rgba(50,50,100,0.6);
+  border-radius: 3px;
+  margin-bottom: 8px;
+  overflow: hidden;
+}
+#progress-fill {
+  height: 100%;
+  width: 0%;
+  background: linear-gradient(90deg, #4a4aff, #ffd700);
+  border-radius: 3px;
+  transition: width 0.4s ease;
+}
+#step-label {
+  font-size: 12px;
+  color: #8888bb;
+  margin-bottom: 4px;
+}
+
+/* ==================== 图例 ==================== */
+#legend {
+  margin: 6px 0 12px;
+  display: flex;
+  gap: 20px;
+  font-size: 12px;
+  color: #9999cc;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+.legend-item { display: flex; align-items: center; gap: 5px; }
+.legend-color {
+  width: 16px; height: 10px; border-radius: 3px;
+  display: inline-block;
+}
+#shortcut-hint {
+  margin: 6px 0 10px;
+  font-size: 12px;
+  color: #7777aa;
+}
+#shortcut-hint .key {
+  display: inline-block;
+  padding: 2px 8px;
+  border: 1px solid rgba(100,100,180,0.3);
+  border-radius: 4px;
+  background: rgba(40,40,80,0.5);
+  font-family: monospace;
+  font-size: 12px;
+  color: #aaaadd;
+}
+</style>
+</head>
+<body>
+
+<h1>减数分裂全过程可视化</h1>
+
+<div id="info-panel">
+  <div id="stage-title"></div>
+  <div id="stage-desc"></div>
+</div>
+
+<div id="canvas-wrap">
+  <canvas id="canvas" width="750" height="520"></canvas>
+</div>
+
+<div id="progress-bar"><div id="progress-fill"></div></div>
+<div id="step-label"></div>
+
+<div id="controls">
+  <button id="btn-reset" title="重置">⟲ 重置</button>
+  <button id="btn-prev" title="上一阶段">◀ 上一步</button>
+  <button id="btn-play" title="自动播放">▶ 播放</button>
+  <button id="btn-next" title="下一阶段">下一步 ▶</button>
+  <button id="btn-speed" title="调节速度">速度: 1x</button>
+</div>
+
+<div id="legend">
+  <div class="legend-item"><span class="legend-color" style="background:#ff4466"></span>父方染色体</div>
+  <div class="legend-item"><span class="legend-color" style="background:#4488ff"></span>母方染色体</div>
+  <div class="legend-item"><span class="legend-color" style="background:#ffffff;border-radius:50%;width:8px;height:8px"></span>着丝粒</div>
+  <div class="legend-item"><span class="legend-color" style="background:linear-gradient(90deg,#ff4466,#ff88aa)"></span>姐妹染色单体(不同色)</div>
+</div>
+
+<div id="shortcut-hint">
+  <span class="key">←→</span> 切换阶段 &nbsp;
+  <span class="key">空格</span> 播放/暂停 &nbsp;
+  <span class="key">R</span> 重置
+</div>
+
+<script>
+// ============================================================
+//  减数分裂可视化模型 — 主程序
+//  科学性标准：2n=4，共4对同源染色体（父方2条+母方2条）
+//  姐妹染色单体始终差异化配色
+//  着丝粒在减I全程不分裂，减II后期才分裂
+// ============================================================
+
+const canvas = document.getElementById('canvas');
+const ctx = canvas.getContext('2d');
+const W = canvas.width, H = canvas.height;
+const CX = W / 2, CY = H / 2;         // 细胞中心
+const CELL_R = 210;                      // 细胞半径
+
+// ---------- 阶段定义 ----------
+const STAGES = [
+  {
+    name: '间期 (Interphase)',
+    desc: '染色体已完成复制，每条染色体含2条姐妹染色单体。核膜完整，染色质呈细丝状。DNA复制和蛋白质合成正在进行。',
+  },
+  {
+    name: '减数第一次分裂 · 前期 I (Prophase I)',
+    desc: '染色质螺旋化形成染色体；同源染色体两两配对（联会），形成四分体；非姐妹染色单体可能发生交叉互换；核膜逐渐消失。',
+  },
+  {
+    name: '减数第一次分裂 · 中期 I (Metaphase I)',
+    desc: '四分体（同源染色体对）排列在细胞赤道板两侧。注意：是同源染色体成对排列，而非单个染色体着丝粒排在赤道板上！纺锤丝连接着丝粒。',
+  },
+  {
+    name: '减数第一次分裂 · 后期 I (Anaphase I)',
+    desc: '同源染色体分离，非同源染色体自由组合向两极移动。**着丝粒不分裂**，姐妹染色单体仍连在一起。',
+  },
+  {
+    name: '减数第一次分裂 · 末期 I (Telophase I)',
+    desc: '细胞膜凹陷，胞质分裂为两个次级性母细胞。每个子细胞染色体减半（n=2），每条染色体仍含2条姐妹染色单体。',
+  },
+  {
+    name: '减数第二次分裂 · 前期 II (Prophase II)',
+    desc: '两个子细胞中，染色体再次散乱分布。细胞内无同源染色体。核膜重新消失（如果末期I重建了的话）。',
+  },
+  {
+    name: '减数第二次分裂 · 中期 II (Metaphase II)',
+    desc: '每条染色体的着丝粒整齐排列在赤道板上。注意：这是单个染色体排列在赤道板上，与中期I不同！',
+  },
+  {
+    name: '减数第二次分裂 · 后期 II (Anaphase II)',
+    desc: '**着丝粒分裂！** 姐妹染色单体分离成为独立染色体，分别向两极移动。这是关键区别点。',
+  },
+  {
+    name: '减数第二次分裂 · 末期 II (Telophase II)',
+    desc: '胞质再次分裂，共形成4个生殖细胞。每个细胞含n=2条染色体（单份），是体细胞染色体数的一半。',
+  },
+];
+
+let currentStage = 0;       // 当前阶段索引
+let animProgress = 0;       // 当前阶段内动画进度 0~1
+let playing = false;
+let playTimer = null;
+let speedIndex = 0;
+const speeds = [0.3, 0.6, 1.0, 1.5]; // 播放速度倍率
+const SPEED_LABELS = ['0.3x', '0.6x', '1x', '1.5x'];
+
+// ---------- 染色体数据建模 ----------
+// 2n=4: 2对同源染色体
+// Chromosome 1 (父方): red系, Chromosome 1 (母方): blue系
+// Chromosome 2 (父方): orange系, Chromosome 2 (母方): green系
+// 每条染色体的姐妹染色单体用不同的色调区分
+
+const CHROMO_DATA = [
+  // 同源对1 - 父方(红)
+  { pair: 0, parent: 'father', id: 0, color1: '#ff3355', color2: '#ff7799', size: 1.0, label: 'Chr1-F' },
+  // 同源对1 - 母方(蓝)
+  { pair: 0, parent: 'mother', id: 0, color1: '#3366ff', color2: '#7799ff', size: 1.0, label: 'Chr1-M' },
+  // 同源对2 - 父方(橙)
+  { pair: 1, parent: 'father', id: 1, color1: '#ff8833', color2: '#ffbb66', size: 0.85, label: 'Chr2-F' },
+  // 同源对2 - 母方(绿)
+  { pair: 1, parent: 'mother', id: 1, color1: '#33cc66', color2: '#77ddaa', size: 0.85, label: 'Chr2-M' },
+];
+
+// ---------- 工具函数 ----------
+function lerp(a, b, t) { return a + (b - a) * Math.max(0, Math.min(1, t)); }
+function easeInOut(t) { return t < 0.5 ? 2*t*t : -1+(4-2*t)*t; }
+function easeOut(t) { return 1 - Math.pow(1 - t, 3); }
+
+// ---------- 绘制细胞轮廓 ----------
+function drawCell(alpha = 1) {
+  ctx.save();
+  ctx.globalAlpha = alpha;
+  // 细胞膜
+  const grad = ctx.createRadialGradient(CX, CY, CELL_R - 40, CX, CY, CELL_R);
+  grad.addColorStop(0, 'rgba(20,20,60,0.05)');
+  grad.addColorStop(0.85, 'rgba(30,30,80,0.15)');
+  grad.addColorStop(1, 'rgba(60,60,140,0.5)');
+  ctx.beginPath();
+  ctx.arc(CX, CY, CELL_R, 0, Math.PI * 2);
+  ctx.fillStyle = grad;
+  ctx.fill();
+  ctx.strokeStyle = 'rgba(100,100,200,0.4)';
+  ctx.lineWidth = 2.5;
+  ctx.stroke();
+  ctx.restore();
+}
+
+// ---------- 绘制细胞核（间期） ----------
+function drawNucleus(alpha = 1) {
+  ctx.save();
+  ctx.globalAlpha = alpha;
+  ctx.beginPath();
+  ctx.arc(CX, CY, 130, 0, Math.PI * 2);
+  ctx.strokeStyle = 'rgba(120,120,200,0.35)';
+  ctx.lineWidth = 2;
+  ctx.setLineDash([6, 4]);
+  ctx.stroke();
+  ctx.setLineDash([]);
+  ctx.restore();
+}
+
+// ---------- 绘制染色质丝（间期） ----------
+function drawChromatin(progress) {
+  ctx.save();
+  ctx.globalAlpha = 0.6 * progress;
+  const coils = [
+    { cx: CX-30, cy: CY-20, amp: 15, freq: 0.08, color: '#ff4466' },
+    { cx: CX+40, cy: CY+10, amp: 12, freq: 0.06, color: '#4488ff' },
+    { cx: CX-10, cy: CY+40, amp: 18, freq: 0.07, color: '#ff8833' },
+    { cx: CX+20, cy: CY-40, amp: 14, freq: 0.09, color: '#33cc66' },
+  ];
+  coils.forEach(c => {
+    ctx.beginPath();
+    ctx.strokeStyle = c.color;
+    ctx.lineWidth = 1.5;
+    for (let i = 0; i <= 100; i++) {
+      const t = i / 100;
+      const x = c.cx + Math.cos(t * Math.PI * 2 * c.freq * 10) * c.amp * (t - 0.5) * 2;
+      const y = c.cy + Math.sin(t * Math.PI * 2 * c.freq * 10) * c.amp * 0.5;
+      if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+    }
+    ctx.stroke();
+  });
+  ctx.restore();
+}
+
+// ---------- 绘制染色体 ----------
+/**
+ * @param {Object} chrom - 染色体数据
+ * @param {number} x - 中心X坐标
+ * @param {number} y - 中心Y坐标
+ * @param {number} angle - 旋转角度(弧度)
+ * @param {number} scale - 缩放比例
+ * @param {boolean} replicated - 是否有姐妹染色单体(X形)
+ * @param {boolean} separated - 是否已分离(着丝粒分裂后)
+ * @param {number} armSpread - 染色单体臂展开角度
+ */
+function drawChromosome(chrom, x, y, angle, scale, replicated = true, separated = false, armSpread = 0.35) {
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.rotate(angle);
+  ctx.scale(scale, scale);
+
+  const s = chrom.size;
+  const len = 38 * s;     // 染色单体长度
+  const armW = 7 * s;     // 臂宽度
+  const cenR = 4;         // 着丝粒半径
+
+  if (!replicated || separated) {
+    // 单条染色单体(分离后) — V形或棒状
+    const spread = armSpread;
+    // 左臂
+    ctx.beginPath();
+    ctx.moveTo(-len * Math.sin(spread), -len * Math.cos(spread));
+    ctx.quadraticCurveTo(0, 0, len * Math.sin(spread), len * Math.cos(spread));
+    ctx.strokeStyle = chrom.color1;
+    ctx.lineWidth = armW;
+    ctx.lineCap = 'round';
+    ctx.stroke();
+    // 着丝粒
+    ctx.beginPath();
+    ctx.arc(0, 0, cenR, 0, Math.PI * 2);
+    ctx.fillStyle = '#ffffcc';
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(200,200,100,0.6)';
+    ctx.lineWidth = 1;
+    ctx.stroke();
+  } else {
+    // X形染色体 — 两条姐妹染色单体
+    const spread = armSpread;
+
+    // 染色单体1 (color1)
+    ctx.beginPath();
+    ctx.moveTo(-len * Math.sin(spread), -len * Math.cos(spread));
+    ctx.quadraticCurveTo(0, 0, len * Math.sin(spread), len * Math.cos(spread));
+    ctx.strokeStyle = chrom.color1;
+    ctx.lineWidth = armW;
+    ctx.lineCap = 'round';
+    ctx.stroke();
+
+    // 染色单体2 (color2) — 镜像对称
+    ctx.beginPath();
+    ctx.moveTo(len * Math.sin(spread), -len * Math.cos(spread));
+    ctx.quadraticCurveTo(0, 0, -len * Math.sin(spread), len * Math.cos(spread));
+    ctx.strokeStyle = chrom.color2;
+    ctx.lineWidth = armW;
+    ctx.lineCap = 'round';
+    ctx.stroke();
+
+    // 着丝粒 (白色高亮点)
+    ctx.beginPath();
+    ctx.arc(0, 0, cenR, 0, Math.PI * 2);
+    ctx.fillStyle = '#ffffee';
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(220,220,100,0.8)';
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+
+    // 着丝粒光晕效果
+    ctx.beginPath();
+    ctx.arc(0, 0, cenR + 2, 0, Math.PI * 2);
+    ctx.strokeStyle = 'rgba(255,255,200,0.25)';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+  }
+
+  ctx.restore();
+}
+
+// ---------- 绘制纺锤丝 ----------
+function drawSpindle(chromosomes, poleY1, poleY2, alpha = 1) {
+  ctx.save();
+  ctx.globalAlpha = alpha;
+  chromosomes.forEach(ch => {
+    if (!ch.visible) return;
+    const x = ch.x, y = ch.y;
+    // 连接到两极的纺锤丝
+    ctx.beginPath();
+    ctx.moveTo(x, y);
+    ctx.lineTo(CX, poleY1);
+    ctx.strokeStyle = 'rgba(200,200,255,0.15)';
+    ctx.lineWidth = 0.8;
+    ctx.stroke();
+
+    ctx.beginPath();
+    ctx.moveTo(x, y);
+    ctx.lineTo(CX, poleY2);
+    ctx.strokeStyle = 'rgba(200,200,255,0.15)';
+    ctx.lineWidth = 0.8;
+    ctx.stroke();
+  });
+  ctx.restore();
+}
+
+// ---------- 绘制中心体 ----------
+function drawCentriole(y, alpha = 1) {
+  ctx.save();
+  ctx.globalAlpha = alpha;
+  ctx.beginPath();
+  ctx.arc(CX, y, 6, 0, Math.PI * 2);
+  ctx.fillStyle = 'rgba(180,180,255,0.6)';
+  ctx.fill();
+  ctx.strokeStyle = 'rgba(200,200,255,0.8)';
+  ctx.lineWidth = 1.5;
+  ctx.stroke();
+  // 小十字标记
+  ctx.beginPath();
+  ctx.moveTo(CX - 3, y); ctx.lineTo(CX + 3, y);
+  ctx.moveTo(CX, y - 3); ctx.lineTo(CX, y + 3);
+  ctx.strokeStyle = 'rgba(150,150,220,0.5)';
+  ctx.lineWidth = 1;
+  ctx.stroke();
+  ctx.restore();
+}
+
+// ============================================================
+//  各阶段渲染函数
+// ============================================================
+
+function renderInterphase(p) {
+  // p: 0→1 动画进度
+  drawCell();
+  const nucleusAlpha = lerp(1, 0.3, p);
+  drawNucleus(nucleusAlpha);
+
+  // 染色质逐渐螺旋化为染色体
+  const chromatinAlpha = lerp(0.6, 0, p);
+  drawChromatin(chromatinAlpha);
+
+  // 随着复制完成，出现X形染色体
+  if (p > 0.5) {
+    const cp = (p - 0.5) * 2; // 0→1
+    const chroms = [
+      { ...CHROMO_DATA[0], x: CX - 40, y: CY - 30, angle: -0.3 },
+      { ...CHROMO_DATA[1], x: CX + 40, y: CY - 20, angle: 0.4 },
+      { ...CHROMO_DATA[2], x: CX - 30, y: CY + 40, angle: 0.2 },
+      { ...CHROMO_DATA[3], x: CX + 35, y: CY + 35, angle: -0.5 },
+    ];
+    chroms.forEach((c, i) => {
+      const stagger = Math.max(0, Math.min(1, (cp - i * 0.08) / 0.3));
+      drawChromosome(c, c.x, c.y, c.angle, 1, true, false, 0.3);
+    });
+  }
+}
+
+function renderProphase1(p) {
+  // p: 0→1
+  // 核膜消失, 染色体凝缩, 联会发生
+  drawCell();
+
+  const nucleusAlpha = lerp(0.35, 0, p);
+  drawNucleus(nucleusAlpha);
+
+  // 中心体向两极移动
+  const centrioleDist = lerp(60, 190, p);
+  drawCentriole(CY - centrioleDist, p);
+  drawCentriole(CY + centrioleDist, p);
+
+  // 纺锤丝
+  if (p > 0.3) {
+    drawSpindle([], CY - centrioleDist, CY + centrioleDist, lerp(0, 1, (p - 0.3) / 0.7));
+  }
+
+  // 四条染色体开始散乱分布，逐渐联会
+  const pairs = [
+    // 同源对0: father(0) + mother(1)
+    {
+      chr: [CHROMO_DATA[0], CHROMO_DATA[1]],
+      x: lerp(CX - 60, CX - 20, p),
+      y: lerp(CY - 50, CY - 10, p),
+      angle: lerp(-0.5, 0.1, p),
+      pairAngle: lerp(0, 0.15, p), // 联会张开角度
+    },
+    // 同源对1: father(2) + mother(3)
+    {
+      chr: [CHROMO_DATA[2], CHROMO_DATA[3]],
+      x: lerp(CX + 50, CX + 20, p),
+      y: lerp(CY + 40, CY + 10, p),
+      angle: lerp(0.3, -0.1, p),
+      pairAngle: lerp(0, 0.15, p),
+    },
+  ];
+
+  pairs.forEach(pair => {
+    const sep = pair.pairAngle;
+    // 父方染色体
+    drawChromosome(pair.chr[0], pair.x - 18, pair.y, pair.angle + sep, 1, true, false, 0.3);
+    // 母方染色体
+    drawChromosome(pair.chr[1], pair.x + 18, pair.y, pair.angle - sep, 1, true, false, 0.3);
+
+    // 联会连接线(四分体)
+    if (p > 0.4) {
+      ctx.save();
+      ctx.globalAlpha = lerp(0, 0.3, (p - 0.4) / 0.6);
+      ctx.setLineDash([3, 3]);
+      ctx.beginPath();
+      ctx.moveTo(pair.x - 18, pair.y);
+      ctx.lineTo(pair.x + 18, pair.y);
+      ctx.strokeStyle = 'rgba(255,255,200,0.4)';
+      ctx.lineWidth = 1;
+      ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.restore();
+    }
+  });
+
+  // 标注"四分体"
+  if (p > 0.7) {
+    ctx.save();
+    ctx.globalAlpha = lerp(0, 0.7, (p - 0.7) / 0.3);
+    ctx.font = '11px Microsoft YaHei';
+    ctx.fillStyle = '#ffd700';
+    ctx.textAlign = 'center';
+    ctx.fillText('四分体', CX, CY - 140);
+    ctx.restore();
+  }
+}
+
+function renderMetaphase1(p) {
+  drawCell();
+
+  // 中心体
+  drawCentriole(CY - 195, 1);
+  drawCentriole(CY + 195, 1);
+
+  // 纺锤丝
+  const allChrs = [];
+  const eqY = CY;
+
+  // 两对同源染色体排列在赤道板两侧
+  // 左侧一对, 右侧一对
+  const offsetX = lerp(0, 0, p);
+  const pairs = [
+    {
+      leftX: CX - 80,
+      rightX: CX - 40,
+      y: eqY,
+      angle: 0.1,
+      data: [CHROMO_DATA[0], CHROMO_DATA[1]],
+      label: '对0',
+    },
+    {
+      leftX: CX + 40,
+      rightX: CX + 80,
+      y: eqY,
+      angle: -0.1,
+      data: [CHROMO_DATA[2], CHROMO_DATA[3]],
+      label: '对1',
+    },
+  ];
+
+  // 绘制纺锤丝
+  pairs.forEach(pair => {
+    allChrs.push({ x: pair.leftX, y: pair.y, visible: true });
+    allChrs.push({ x: pair.rightX, y: pair.y, visible: true });
+  });
+  drawSpindle(allChrs, CY - 195, CY + 195, 1);
+
+  // 赤道板线
+  ctx.save();
+  ctx.setLineDash([5, 5]);
+  ctx.beginPath();
+  ctx.moveTo(CX - 180, eqY);
+  ctx.lineTo(CX + 180, eqY);
+  ctx.strokeStyle = 'rgba(255,255,100,0.25)';
+  ctx.lineWidth = 1;
+  ctx.stroke();
+  ctx.setLineDash([]);
+  ctx.font = '10px Microsoft YaHei';
+  ctx.fillStyle = 'rgba(255,255,100,0.35)';
+  ctx.textAlign = 'left';
+  ctx.fillText('赤道板', CX + 170, eqY - 5);
+  ctx.restore();
+
+  // 绘制染色体对
+  pairs.forEach(pair => {
+    // 父方(在左侧)
+    drawChromosome(pair.data[0], pair.leftX, pair.y, pair.angle, 1, true, false, 0.3);
+    // 母方(在右侧)
+    drawChromosome(pair.data[1], pair.rightX, pair.y, pair.angle, 1, true, false, 0.3);
+  });
+
+  // 标注
+  ctx.save();
+  ctx.font = 'bold 12px Microsoft YaHei';
+  ctx.fillStyle = '#ffd700';
+  ctx.textAlign = 'center';
+  ctx.globalAlpha = 0.8;
+  ctx.fillText('← 同源染色体对 →', CX, eqY - 55);
+  ctx.restore();
+}
+
+function renderAnaphase1(p) {
+  drawCell();
+
+  const centrioleY1 = CY - 195;
+  const centrioleY2 = CY + 195;
+  drawCentriole(centrioleY1, 1);
+  drawCentriole(centrioleY2, 1);
+
+  const ep = easeOut(Math.min(1, p * 1.2)); // 加速运动
+  const moveDist = ep * 120;
+
+  // 同源染色体向两极移动
+  // 对0: Chr0-F 走向上极, Chr0-M 走向下极
+  // 对1: Chr2-F 走向上极, Chr3-M 走向下极
+  // (模拟自由组合)
+
+  const moves = [
+    { chr: CHROMO_DATA[0], sx: CX - 80, sy: CY, tx: CX - 80, ty: CY - moveDist, dir: 'up' },
+    { chr: CHROMO_DATA[1], sx: CX - 40, sy: CY, tx: CX - 40, ty: CY + moveDist, dir: 'down' },
+    { chr: CHROMO_DATA[2], sx: CX + 40, sy: CY, tx: CX + 40, ty: CY - moveDist, dir: 'up' },
+    { chr: CHROMO_DATA[3], sx: CX + 80, sy: CY, tx: CX + 80, ty: CY + moveDist, dir: 'down' },
+  ];
+
+  // 绘制纺锤丝(动态收缩)
+  const visChrs = moves.map(m => ({ x: m.tx, y: m.ty }));
+  drawSpindle(visChrs, centrioleY1, centrioleY2, lerp(1, 0.3, ep));
+
+  moves.forEach(m => {
+    const angle = m.dir === 'up' ? -0.15 : 0.15;
+    drawChromosome(m.chr, m.tx, m.ty, angle, 1, true, false, 0.3);
+  });
+
+  // 标注
+  if (ep > 0.2) {
+    ctx.save();
+    ctx.font = '11px Microsoft YaHei';
+    ctx.fillStyle = 'rgba(255,200,100,0.7)';
+    ctx.textAlign = 'center';
+    ctx.globalAlpha = lerp(0, 1, (ep - 0.2) / 0.5);
+    ctx.fillText('⬆ 同源染色体分离 ⬇', CX, CY - moveDist - 25);
+    ctx.fillText('着丝粒未分裂，姐妹染色单体仍相连', CX, CY + moveDist + 30);
+    ctx.restore();
+  }
+}
+
+function renderTelophase1(p) {
+  drawCell();
+
+  const ep = easeInOut(p);
+
+  // 细胞膜开始凹陷
+  const invagination = ep * 40; // 凹陷深度
+
+  ctx.save();
+  // 绘制凹陷的细胞轮廓
+  ctx.beginPath();
+  ctx.moveTo(CX - CELL_R, CY - invagination);
+  ctx.quadraticCurveTo(CX, CY - invagination * 3, CX + CELL_R, CY - invagination);
+  ctx.lineTo(CX + CELL_R, CY + invagination);
+  ctx.quadraticCurveTo(CX, CY + invagination * 3, CX - CELL_R, CY + invagination);
+  ctx.closePath();
+  ctx.strokeStyle = 'rgba(100,100,200,0.5)';
+  ctx.lineWidth = 2.5;
+  ctx.stroke();
+
+  // 上半部分背景
+  ctx.beginPath();
+  ctx.moveTo(CX - CELL_R, CY - invagination);
+  ctx.quadraticCurveTo(CX, CY - invagination * 3, CX + CELL_R, CY - invagination);
+  ctx.lineTo(CX + CELL_R, CY - CELL_R + 50);
+  ctx.lineTo(CX - CELL_R, CY - CELL_R + 50);
+  ctx.closePath();
+  ctx.fillStyle = 'rgba(15,15,50,0.3)';
+  ctx.fill();
+
+  // 下半部分背景
+  ctx.beginPath();
+  ctx.moveTo(CX - CELL_R, CY + invagination);
+  ctx.quadraticCurveTo(CX, CY + invagination * 3, CX + CELL_R, CY + invagination);
+  ctx.lineTo(CX + CELL_R, CY + CELL_R - 50);
+  ctx.lineTo(CX - CELL_R, CY + CELL_R - 50);
+  ctx.closePath();
+  ctx.fillStyle = 'rgba(15,15,50,0.3)';
+  ctx.fill();
+
+  ctx.restore();
+
+  // 两个子细胞
+  const subCellY1 = CY - 90 * ep;
+  const subCellY2 = CY + 90 * ep;
+
+  // 上方子细胞的染色体
+  const topChrs = [
+    { ...CHROMO_DATA[0], x: CX - 30, y: subCellY1 - 10 },
+    { ...CHROMO_DATA[2], x: CX + 30, y: subCellY1 - 10 },
+  ];
+  // 下方子细胞的染色体
+  const botChrs = [
+    { ...CHROMO_DATA[1], x: CX - 30, y: subCellY2 + 10 },
+    { ...CHROMO_DATA[3], x: CX + 30, y: subCellY2 + 10 },
+  ];
+
+  topChrs.forEach(c => drawChromosome(c.chr || CHROMO_DATA.find(d => d.label === c._label) || CHROMO_DATA[0], c.x, c.y, 0.1, 1, true, false, 0.3));
+  botChrs.forEach(c => drawChromosome(c.chr || CHROMO_DATA.find(d => d.label === c._label) || CHROMO_DATA[1], c.x, c.y, -0.1, 1, true, false, 0.3));
+
+  // 简化绘制
+  drawChromosome(CHROMO_DATA[0], CX - 30, subCellY1 - 10, 0.1, 1, true, false, 0.3);
+  drawChromosome(CHROMO_DATA[2], CX + 30, subCellY1 - 10, -0.1, 1, true, false, 0.3);
+  drawChromosome(CHROMO_DATA[1], CX - 30, subCellY2 + 10, 0.1, 1, true, false, 0.3);
+  drawChromosome(CHROMO_DATA[3], CX + 30, subCellY2 + 10, -0.1, 1, true, false, 0.3);
+
+  // 标注
+  if (ep > 0.5) {
+    ctx.save();
+    ctx.globalAlpha = lerp(0, 0.8, (ep - 0.5) * 2);
+    ctx.font = '11px Microsoft YaHei';
+    ctx.fillStyle = '#aaaadd';
+    ctx.textAlign = 'center';
+    ctx.fillText('次级性母细胞 ↑ (n=2)', CX, subCellY1 - 45);
+    ctx.fillText('次级性母细胞 ↓ (n=2)', CX, subCellY2 + 45);
+    ctx.restore();
+  }
+}
+
+function renderProphase2(p, cellY, label) {
+  // 在指定Y位置绘制一个子细胞中的前期II
+  const cy = cellY;
+
+  // 子细胞轮廓
+  ctx.save();
+  ctx.beginPath();
+  ctx.arc(CX, cy, 130, 0, Math.PI * 2);
+  ctx.strokeStyle = 'rgba(80,80,180,0.35)';
+  ctx.lineWidth = 2;
+  ctx.stroke();
+  ctx.restore();
+
+  // 中心体
+  drawCentriole(cy - 120, p);
+  drawCentriole(cy + 120, p);
+
+  // 散乱的染色体
+  const chroms = [
+    { chr: CHROMO_DATA[0], x: CX - 35, y: cy - 25, angle: -0.4 },
+    { chr: CHROMO_DATA[2], x: CX + 30, y: cy + 20, angle: 0.3 },
+  ];
+
+  chroms.forEach(c => {
+    drawChromosome(c.chr, c.x, c.y, c.angle, 1, true, false, 0.3);
+  });
+
+  // 标注
+  ctx.save();
+  ctx.font = '11px Microsoft YaHei';
+  ctx.fillStyle = 'rgba(200,200,255,0.6)';
+  ctx.textAlign = 'center';
+  ctx.fillText(label, CX, cy - 145);
+  ctx.restore();
+}
+
+function renderMetaphase2(p, cellY, label) {
+  const cy = cellY;
+
+  ctx.save();
+  ctx.beginPath();
+  ctx.arc(CX, cy, 130, 0, Math.PI * 2);
+  ctx.strokeStyle = 'rgba(80,80,180,0.35)';
+  ctx.lineWidth = 2;
+  ctx.stroke();
+  ctx.restore();
+
+  // 赤道板
+  ctx.save();
+  ctx.setLineDash([4, 4]);
+  ctx.beginPath();
+  ctx.moveTo(CX - 100, cy);
+  ctx.lineTo(CX + 100, cy);
+  ctx.strokeStyle = 'rgba(255,255,100,0.2)';
+  ctx.lineWidth = 1;
+  ctx.stroke();
+  ctx.setLineDash([]);
+  ctx.restore();
+
+  // 染色体着丝粒排列在赤道板上
+  const chroms = [
+    { chr: CHROMO_DATA[0], x: CX - 30, y: cy, angle: 0.1 },
+    { chr: CHROMO_DATA[2], x: CX + 30, y: cy, angle: -0.1 },
+  ];
+
+  chroms.forEach(c => {
+    drawChromosome(c.chr, c.x, c.y, c.angle, 1, true, false, 0.3);
+  });
+
+  ctx.save();
+  ctx.font = '11px Microsoft YaHei';
+  ctx.fillStyle = 'rgba(200,200,255,0.6)';
+  ctx.textAlign = 'center';
+  ctx.fillText(label, CX, cy - 145);
+  ctx.restore();
+}
+
+function renderAnaphase2(p, cellY) {
+  const cy = cellY;
+  const ep = easeOut(Math.min(1, p * 1.2));
+  const dist = ep * 55;
+
+  ctx.save();
+  ctx.beginPath();
+  ctx.arc(CX, cy, 130, 0, Math.PI * 2);
+  ctx.strokeStyle = 'rgba(80,80,180,0.35)';
+  ctx.lineWidth = 2;
+  ctx.stroke();
+  ctx.restore();
+
+  // 着丝粒分裂！姐妹染色单体分离
+  // Chr0 分离为两条
+  drawChromosome(CHROMO_DATA[0], CX - 30, cy - dist, 0.1, 1, false, true, 0.15);
+  drawChromosome(CHROMO_DATA[0], CX - 30, cy + dist, 0.1, 1, false, true, 0.15);
+  // Chr2 分离为两条
+  drawChromosome(CHROMO_DATA[2], CX + 30, cy - dist, -0.1, 1, false, true, 0.15);
+  drawChromosome(CHROMO_DATA[2], CX + 30, cy + dist, -0.1, 1, false, true, 0.15);
+
+  if (ep > 0.3) {
+    ctx.save();
+    ctx.globalAlpha = lerp(0, 0.8, (ep - 0.3) / 0.5);
+    ctx.font = '11px Microsoft YaHei';
+    ctx.fillStyle = '#ff8866';
+    ctx.textAlign = 'center';
+    ctx.fillText('⚡ 着丝粒分裂！姐妹染色单体分离！', CX, cy - dist - 25);
+    ctx.restore();
+  }
+}
+
+function renderTelophase2(p, cellY) {
+  const cy = cellY;
+  const ep = easeInOut(p);
+
+  // 子细胞核重新形成
+  ctx.save();
+  ctx.beginPath();
+  ctx.arc(CX, cy - 35 * ep, 60, 0, Math.PI * 2);
+  ctx.strokeStyle = `rgba(120,120,200,${lerp(0, 0.3, ep)})`;
+  ctx.lineWidth = 1.5;
+  ctx.setLineDash([4, 3]);
+  ctx.stroke();
+  ctx.setLineDash([]);
+
+  ctx.beginPath();
+  ctx.arc(CX, cy + 35 * ep, 60, 0, Math.PI * 2);
+  ctx.strokeStyle = `rgba(120,120,200,${lerp(0, 0.3, ep)})`;
+  ctx.lineWidth = 1.5;
+  ctx.setLineDash([4, 3]);
+  ctx.stroke();
+  ctx.setLineDash([]);
+  ctx.restore();
+
+  // 染色体去凝缩
+  const shrink = lerp(1, 0.7, ep);
+
+  drawChromosome(CHROMO_DATA[0], CX - 20, cy - 35 * ep, 0.2, shrink, false, true, 0.1);
+  drawChromosome(CHROMO_DATA[2], CX + 20, cy - 35 * ep, -0.2, shrink, false, true, 0.1);
+  drawChromosome(CHROMO_DATA[0], CX - 20, cy + 35 * ep, 0.2, shrink, false, true, 0.1);
+  drawChromosome(CHROMO_DATA[2], CX + 20, cy + 35 * ep, -0.2, shrink, false, true, 0.1);
+}
+
+function renderFinalResult(p) {
+  const ep = easeInOut(p);
+
+  // 绘制四个子细胞
+  const positions = [
+    { x: CX - 140, y: CY - 100, label: '生殖细胞 ①' },
+    { x: CX + 140, y: CY - 100, label: '生殖细胞 ②' },
+    { x: CX - 140, y: CY + 100, label: '生殖细胞 ③' },
+    { x: CX + 140, y: CY + 100, label: '生殖细胞 ④' },
+  ];
+
+  // 淡入背景
+  ctx.save();
+  ctx.globalAlpha = lerp(0.1, 0.3, ep);
+  ctx.fillStyle = '#0a0a2e';
+  ctx.fillRect(0, 0, W, H);
+  ctx.restore();
+
+  positions.forEach((pos, i) => {
+    // 细胞轮廓
+    ctx.save();
+    ctx.globalAlpha = ep;
+    ctx.beginPath();
+    ctx.arc(pos.x, pos.y, 75, 0, Math.PI * 2);
+    ctx.strokeStyle = 'rgba(100,100,200,0.4)';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+    ctx.restore();
+
+    // 每个细胞含2条独立染色体(n=2)
+    const chromIdx = i % 2 === 0 ? [0, 2] : [1, 3];
+    const c1 = CHROMO_DATA[chromIdx[0]];
+    const c2 = CHROMO_DATA[chromIdx[1]];
+
+    ctx.save();
+    ctx.globalAlpha = ep;
+    drawChromosome(c1, pos.x - 15, pos.y, 0.15, 0.9, false, true, 0.1);
+    drawChromosome(c2, pos.x + 15, pos.y, -0.15, 0.9, false, true, 0.1);
+    ctx.restore();
+
+    // 标签
+    ctx.save();
+    ctx.globalAlpha = lerp(0, 0.7, ep);
+    ctx.font = '11px Microsoft YaHei';
+    ctx.fillStyle = '#ccccee';
+    ctx.textAlign = 'center';
+    ctx.fillText(pos.label, pos.x, pos.y + 95);
+    ctx.font = '10px Microsoft YaHei';
+    ctx.fillStyle = '#9999bb';
+    ctx.fillText('n=2', pos.x, pos.y + 108);
+    ctx.restore();
+  });
+
+  // 总结文字
+  if (ep > 0.6) {
+    ctx.save();
+    ctx.globalAlpha = lerp(0, 0.9, (ep - 0.6) / 0.4);
+    ctx.font = 'bold 14px Microsoft YaHei';
+    ctx.fillStyle = '#ffd700';
+    ctx.textAlign = 'center';
+    ctx.fillText('减数分裂完成！1个初级性母细胞 → 4个生殖细胞', CX, CY + 195);
+    ctx.font = '12px Microsoft YaHei';
+    ctx.fillStyle = '#aaaacc';
+    ctx.fillText('染色体数目减半 (2n→n)', CX, CY + 215);
+    ctx.restore();
+  }
+}
+
+// ============================================================
+//  统一渲染引擎 — 基于状态插值的连续动画
+//  每条染色体在每个阶段都有定义的位置，动画在阶段间平滑插值
+// ============================================================
+
+// 染色体在各阶段的锚点位置（关键帧）
+// 每条染色体用一个对象表示，包含它在每个阶段的目标状态
+const KEYFRAMES = [
+  // 阶段0: 间期 — 染色质弥散分布，核膜完整
+  {
+    type: 'interphase',
+    chroms: [
+      { idx: 0, x: CX-35, y: CY-25, angle: -0.3, rep: true, sep: false, scale: 1 },
+      { idx: 1, x: CX+40, y: CY-15, angle: 0.4, rep: true, sep: false, scale: 1 },
+      { idx: 2, x: CX-25, y: CY+35, angle: 0.2, rep: true, sep: false, scale: 1 },
+      { idx: 3, x: CX+35, y: CY+35, angle: -0.5, rep: true, sep: false, scale: 1 },
+    ],
+    extra: { nucleusAlpha: 0.6, centrioles: [], cellInv: 0, subCells: [] }
+  },
+  // 阶段1: 前期I — 联会形成四分体
+  {
+    type: 'prophase1',
+    chroms: [
+      { idx: 0, x: CX-35, y: CY-10, angle: 0.1, rep: true, sep: false, scale: 1 },
+      { idx: 1, x: CX-15, y: CY-10, angle: 0.1, rep: true, sep: false, scale: 1 },
+      { idx: 2, x: CX+15, y: CY+10, angle: -0.1, rep: true, sep: false, scale: 1 },
+      { idx: 3, x: CX+35, y: CY+10, angle: -0.1, rep: true, sep: false, scale: 1 },
+    ],
+    extra: { nucleusAlpha: 0, centrioleDist: 190, spindleAlpha: 1 }
+  },
+  // 阶段2: 中期I — 四分体排赤道板两侧
+  {
+    type: 'metaphase1',
+    chroms: [
+      { idx: 0, x: CX-80, y: CY, angle: 0.1, rep: true, sep: false, scale: 1 },
+      { idx: 1, x: CX-40, y: CY, angle: 0.1, rep: true, sep: false, scale: 1 },
+      { idx: 2, x: CX+40, y: CY, angle: -0.1, rep: true, sep: false, scale: 1 },
+      { idx: 3, x: CX+80, y: CY, angle: -0.1, rep: true, sep: false, scale: 1 },
+    ],
+    extra: { centrioleDist: 195, spindleAlpha: 1 }
+  },
+  // 阶段3: 后期I — 同源染色体分离
+  {
+    type: 'anaphase1',
+    chroms: [
+      { idx: 0, x: CX-80, y: CY-120, angle: -0.15, rep: true, sep: false, scale: 1 },
+      { idx: 1, x: CX-40, y: CY+120, angle: 0.15, rep: true, sep: false, scale: 1 },
+      { idx: 2, x: CX+40, y: CY-120, angle: -0.15, rep: true, sep: false, scale: 1 },
+      { idx: 3, x: CX+80, y: CY+120, angle: 0.15, rep: true, sep: false, scale: 1 },
+    ],
+    extra: { centrioleDist: 195, spindleAlpha: 0.5 }
+  },
+  // 阶段4: 末期I — 细胞分裂为两个子细胞
+  {
+    type: 'telophase1',
+    chroms: [
+      { idx: 0, x: CX-30, y: CY-90, angle: 0.1, rep: true, sep: false, scale: 1 },
+      { idx: 1, x: CX-30, y: CY+90, angle: 0.1, rep: true, sep: false, scale: 1 },
+      { idx: 2, x: CX+30, y: CY-90, angle: -0.1, rep: true, sep: false, scale: 1 },
+      { idx: 3, x: CX+30, y: CY+90, angle: -0.1, rep: true, sep: false, scale: 1 },
+    ],
+    extra: { cellInv: 40, subCells: [{y: CY-90, r: 130}, {y: CY+90, r: 130}] }
+  },
+  // 阶段5: 前期II — 两个子细胞中染色体散乱分布
+  {
+    type: 'prophase2',
+    chroms: [
+      { idx: 0, x: CX-35, y: CY-110-25, angle: -0.4, rep: true, sep: false, scale: 1 },
+      { idx: 1, x: CX-35, y: CY+110-25, angle: -0.4, rep: true, sep: false, scale: 1 },
+      { idx: 2, x: CX+30, y: CY-110+20, angle: 0.3, rep: true, sep: false, scale: 1 },
+      { idx: 3, x: CX+30, y: CY+110+20, angle: 0.3, rep: true, sep: false, scale: 1 },
+    ],
+    extra: { subCells: [{y: CY-110, r: 130}, {y: CY+110, r: 130}], centrioleDist: 120 }
+  },
+  // 阶段6: 中期II — 染色体着丝粒排赤道板
+  {
+    type: 'metaphase2',
+    chroms: [
+      { idx: 0, x: CX-30, y: CY-110, angle: 0.1, rep: true, sep: false, scale: 1 },
+      { idx: 1, x: CX-30, y: CY+110, angle: 0.1, rep: true, sep: false, scale: 1 },
+      { idx: 2, x: CX+30, y: CY-110, angle: -0.1, rep: true, sep: false, scale: 1 },
+      { idx: 3, x: CX+30, y: CY+110, angle: -0.1, rep: true, sep: false, scale: 1 },
+    ],
+    extra: { subCells: [{y: CY-110, r: 130}, {y: CY+110, r: 130}] }
+  },
+  // 阶段7: 后期II — 着丝粒分裂，姐妹染色单体分离
+  {
+    type: 'anaphase2',
+    chroms: [
+      { idx: 0, x: CX-30, y: CY-110-55, angle: 0.1, rep: false, sep: true, scale: 1 },
+      { idx: 0, x: CX-30, y: CY-110+55, angle: 0.1, rep: false, sep: true, scale: 1 },
+      { idx: 1, x: CX-30, y: CY+110-55, angle: 0.1, rep: false, sep: true, scale: 1 },
+      { idx: 1, x: CX-30, y: CY+110+55, angle: 0.1, rep: false, sep: true, scale: 1 },
+      { idx: 2, x: CX+30, y: CY-110-55, angle: -0.1, rep: false, sep: true, scale: 1 },
+      { idx: 2, x: CX+30, y: CY-110+55, angle: -0.1, rep: false, sep: true, scale: 1 },
+      { idx: 3, x: CX+30, y: CY+110-55, angle: -0.1, rep: false, sep: true, scale: 1 },
+      { idx: 3, x: CX+30, y: CY+110+55, angle: -0.1, rep: false, sep: true, scale: 1 },
+    ],
+    extra: { subCells: [{y: CY-110, r: 130}, {y: CY+110, r: 130}] }
+  },
+  // 阶段8: 末期II → 4个生殖细胞
+  {
+    type: 'final',
+    chroms: [
+      { idx: 0, x: CX-140-15, y: CY-100, angle: 0.15, rep: false, sep: true, scale: 0.9 },
+      { idx: 2, x: CX-140+15, y: CY-100, angle: -0.15, rep: false, sep: true, scale: 0.9 },
+      { idx: 0, x: CX+140-15, y: CY-100, angle: 0.15, rep: false, sep: true, scale: 0.9 },
+      { idx: 2, x: CX+140+15, y: CY-100, angle: -0.15, rep: false, sep: true, scale: 0.9 },
+      { idx: 1, x: CX-140-15, y: CY+100, angle: 0.15, rep: false, sep: true, scale: 0.9 },
+      { idx: 3, x: CX-140+15, y: CY+100, angle: -0.15, rep: false, sep: true, scale: 0.9 },
+      { idx: 1, x: CX+140-15, y: CY+100, angle: 0.15, rep: false, sep: true, scale: 0.9 },
+      { idx: 3, x: CX+140+15, y: CY+100, angle: -0.15, rep: false, sep: true, scale: 0.9 },
+    ],
+    extra: { cells: [
+      {x: CX-140, y: CY-100, r: 75},
+      {x: CX+140, y: CY-100, r: 75},
+      {x: CX-140, y: CY+100, r: 75},
+      {x: CX+140, y: CY+100, r: 75},
+    ]}
+  },
+];
+
+// 插值两条染色体状态
+function lerpChroma(a, b, t) {
+  return {
+    idx: a.idx,
+    x: lerp(a.x, b.x, t),
+    y: lerp(a.y, b.y, t),
+    angle: lerp(a.angle, b.angle, t),
+    rep: a.rep, // 布尔值不插值，用阈值判断
+    sep: a.sep,
+    scale: lerp(a.scale, b.scale, t),
+  };
+}
+
+// 获取任意时刻的完整染色体状态
+function getChromosomesAt(stage, progress) {
+  const s = Math.floor(stage);
+  const t = stage - s;
+  const smoothT = easeInOut(t);
+
+  if (s >= KEYFRAMES.length - 1) {
+    // 已到最后一个阶段
+    return KEYFRAMES[KEYFRAMES.length - 1].chroms.map(c => ({...c}));
+  }
+
+  const from = KEYFRAMES[s].chroms;
+  const to = KEYFRAMES[s + 1].chroms;
+
+  // 处理染色体数量变化的情况（后期II从4条变8条）
+  const maxLen = Math.max(from.length, to.length);
+  const result = [];
+  for (let i = 0; i < maxLen; i++) {
+    const a = from[i % from.length];
+    const b = to[i % to.length];
+    result.push(lerpChroma(a, b, smoothT));
+  }
+  return result;
+}
+
+// 获取任意时刻的extra数据
+function getExtraAt(stage, progress) {
+  const s = Math.floor(stage);
+  const t = stage - s;
+  const smoothT = easeInOut(t);
+
+  if (s >= KEYFRAMES.length - 1) {
+    return KEYFRAMES[KEYFRAMES.length - 1].extra;
+  }
+  const from = KEYFRAMES[s].extra;
+  const to = KEYFRAMES[s + 1].extra;
+
+  const result = {};
+  for (const key of Object.keys(from)) {
+    const fv = from[key];
+    const tv = to[key];
+    if (typeof fv === 'number' && typeof tv === 'number') {
+      result[key] = lerp(fv, tv, smoothT);
+    } else if (Array.isArray(fv) && Array.isArray(tv)) {
+      result[key] = fv.map((item, i) => ({...item, ...(tv[i] || {})}));
+    } else {
+      result[key] = tv; // 默认用目标值
+    }
+  }
+  for (const key of Object.keys(to)) {
+    if (!(key in result)) result[key] = to[key];
+  }
+  return result;
+}
+
+function render() {
+  ctx.clearRect(0, 0, W, H);
+  ctx.fillStyle = '#0a0a2e';
+  ctx.fillRect(0, 0, W, H);
+
+  // 计算当前总进度（含阶段内动画）
+  const totalProgress = currentStage + animProgress;
+  const chroms = getChromosomesAt(totalProgress, animProgress);
+  const extra = getExtraAt(totalProgress, animProgress);
+
+  // 绘制细胞膜（末期I凹陷）
+  drawCell();
+  if (extra.cellInv) {
+    drawInvaginatedCell(extra.cellInv);
+  }
+
+  // 绘制子细胞轮廓（末期I之后）
+  if (extra.subCells) {
+    extra.subCells.forEach(sc => {
+      ctx.save();
+      ctx.beginPath();
+      ctx.arc(CX, sc.y, sc.r, 0, Math.PI * 2);
+      ctx.strokeStyle = 'rgba(80,80,180,0.3)';
+      ctx.lineWidth = 2;
+      ctx.stroke();
+      ctx.restore();
+    });
+  }
+
+  // 绘制4个生殖细胞轮廓（最终阶段）
+  if (extra.cells) {
+    extra.cells.forEach(c => {
+      ctx.save();
+      ctx.beginPath();
+      ctx.arc(c.x, c.y, c.r, 0, Math.PI * 2);
+      ctx.strokeStyle = 'rgba(100,100,200,0.4)';
+      ctx.lineWidth = 2;
+      ctx.stroke();
+      ctx.restore();
+    });
+  }
+
+  // 绘制核膜（间期）
+  if (extra.nucleusAlpha > 0.01) {
+    drawNucleus(extra.nucleusAlpha);
+  }
+
+  // 绘制中心体
+  if (extra.centrioleDist) {
+    drawCentriole(CY - extra.centrioleDist, 1);
+    drawCentriole(CY + extra.centrioleDist, 1);
+  }
+
+  // 绘制纺锤丝
+  if (extra.spindleAlpha > 0.01) {
+    drawSpindle(chroms, CY - (extra.centrioleDist || 195), CY + (extra.centrioleDist || 195), extra.spindleAlpha);
+  }
+
+  // 绘制染色体
+  chroms.forEach(c => {
+    drawChromosome(CHROMO_DATA[c.idx], c.x, c.y, c.angle, c.scale, c.rep, c.sep, 0.3);
+  });
+
+  // 阶段特定标注
+  drawStageLabels(currentStage, animProgress, extra);
+}
+
+// 绘制凹陷细胞
+function drawInvaginatedCell(inv) {
+  ctx.save();
+  ctx.beginPath();
+  ctx.moveTo(CX - CELL_R, CY - inv);
+  ctx.quadraticCurveTo(CX, CY - inv * 3, CX + CELL_R, CY - inv);
+  ctx.lineTo(CX + CELL_R, CY + inv);
+  ctx.quadraticCurveTo(CX, CY + inv * 3, CX - CELL_R, CY + inv);
+  ctx.closePath();
+  ctx.strokeStyle = 'rgba(100,100,200,0.5)';
+  ctx.lineWidth = 2.5;
+  ctx.stroke();
+  ctx.restore();
+}
+
+// 阶段标注
+function drawStageLabels(stage, p, extra) {
+  ctx.save();
+  ctx.textAlign = 'center';
+  ctx.font = '11px Microsoft YaHei';
+
+  switch (stage) {
+    case 0: // 间期 — 染色质丝
+      if (p < 0.5) {
+        drawChromatin(0.6 * (1 - p * 2));
+      }
+      break;
+    case 1: // 前期I — 四分体标注
+      if (p > 0.5) {
+        ctx.globalAlpha = (p - 0.5) * 2 * 0.7;
+        ctx.fillStyle = '#ffd700';
+        ctx.fillText('四分体', CX, CY - 140);
+      }
+      break;
+    case 2: // 中期I — 赤道板和标注
+      ctx.setLineDash([5, 5]);
+      ctx.beginPath();
+      ctx.moveTo(CX - 180, CY);
+      ctx.lineTo(CX + 180, CY);
+      ctx.strokeStyle = 'rgba(255,255,100,0.2)';
+      ctx.lineWidth = 1;
+      ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.font = '10px Microsoft YaHei';
+      ctx.fillStyle = 'rgba(255,255,100,0.35)';
+      ctx.textAlign = 'left';
+      ctx.fillText('赤道板', CX + 170, CY - 5);
+      ctx.textAlign = 'center';
+      ctx.font = 'bold 12px Microsoft YaHei';
+      ctx.fillStyle = '#ffd700';
+      ctx.globalAlpha = 0.8;
+      ctx.fillText('← 同源染色体对 →', CX, CY - 55);
+      break;
+    case 3: // 后期I — 分离标注
+      const moveDist = easeOut(Math.min(1, p * 1.2)) * 120;
+      if (moveDist > 20) {
+        ctx.globalAlpha = 0.7;
+        ctx.fillStyle = 'rgba(255,200,100,0.7)';
+        ctx.font = '11px Microsoft YaHei';
+        ctx.fillText('⬆ 同源染色体分离 ⬇', CX, CY - moveDist - 25);
+        ctx.fillText('着丝粒未分裂，姐妹染色单体仍相连', CX, CY + moveDist + 30);
+      }
+      break;
+    case 4: // 末期I — 子细胞标注
+      if (extra.cellInv > 15) {
+        ctx.globalAlpha = 0.8;
+        ctx.fillStyle = '#aaaadd';
+        ctx.font = '11px Microsoft YaHei';
+        ctx.fillText('次级性母细胞 ↑ (n=2)', CX, CY - 90 - 45);
+        ctx.fillText('次级性母细胞 ↓ (n=2)', CX, CY + 90 + 45);
+      }
+      break;
+    case 5:
+      ctx.globalAlpha = 0.6;
+      ctx.fillStyle = 'rgba(200,200,255,0.6)';
+      ctx.font = '11px Microsoft YaHei';
+      ctx.fillText('子细胞① 前期II', CX, CY - 110 - 145);
+      ctx.fillText('子细胞② 前期II', CX, CY + 110 - 145);
+      break;
+    case 6:
+      ctx.globalAlpha = 0.6;
+      ctx.fillStyle = 'rgba(200,200,255,0.6)';
+      ctx.font = '11px Microsoft YaHei';
+      ctx.fillText('子细胞① 中期II', CX, CY - 110 - 145);
+      ctx.fillText('子细胞② 中期II', CX, CY + 110 - 145);
+      // 赤道板
+      [CY-110, CY+110].forEach(cy => {
+        ctx.setLineDash([4, 4]);
+        ctx.beginPath();
+        ctx.moveTo(CX-100, cy);
+        ctx.lineTo(CX+100, cy);
+        ctx.strokeStyle = 'rgba(255,255,100,0.2)';
+        ctx.lineWidth = 1;
+        ctx.stroke();
+        ctx.setLineDash([]);
+      });
+      break;
+    case 7:
+      ctx.globalAlpha = 0.8;
+      ctx.fillStyle = '#ff8866';
+      ctx.font = '11px Microsoft YaHei';
+      ctx.fillText('⚡ 着丝粒分裂！姐妹染色单体分离！', CX, CY - 110 - 55 - 25);
+      ctx.fillText('⚡ 着丝粒分裂！姐妹染色单体分离！', CX, CY + 110 - 55 - 25);
+      break;
+    case 8:
+      ctx.globalAlpha = 0.7;
+      ctx.fillStyle = '#ccccee';
+      ctx.font = '11px Microsoft YaHei';
+      ctx.fillText('生殖细胞①', CX-140, CY-100+95);
+      ctx.fillText('生殖细胞②', CX+140, CY-100+95);
+      ctx.fillText('生殖细胞③', CX-140, CY+100+95);
+      ctx.fillText('生殖细胞④', CX+140, CY+100+95);
+      ctx.font = '10px Microsoft YaHei';
+      ctx.fillStyle = '#9999bb';
+      ctx.fillText('n=2', CX-140, CY-100+108);
+      ctx.fillText('n=2', CX+140, CY-100+108);
+      ctx.fillText('n=2', CX-140, CY+100+108);
+      ctx.fillText('n=2', CX+140, CY+100+108);
+      if (p > 0.4) {
+        ctx.globalAlpha = (p - 0.4) / 0.6 * 0.9;
+        ctx.font = 'bold 14px Microsoft YaHei';
+        ctx.fillStyle = '#ffd700';
+        ctx.fillText('减数分裂完成！1个初级性母细胞 → 4个生殖细胞', CX, CY + 195);
+        ctx.font = '12px Microsoft YaHei';
+        ctx.fillStyle = '#aaaacc';
+        ctx.fillText('染色体数目减半 (2n→n)', CX, CY + 215);
+      }
+      break;
+  }
+  ctx.restore();
+}
+
+// ---------- UI 更新 ----------
+function updateUI() {
+  const stage = STAGES[currentStage];
+  document.getElementById('stage-title').textContent = `${currentStage + 1}/${STAGES.length}  ${stage.name}`;
+  document.getElementById('stage-desc').textContent = stage.desc;
+  document.getElementById('progress-fill').style.width = `${((currentStage + animProgress) / STAGES.length) * 100}%`;
+  document.getElementById('step-label').textContent = `共 ${STAGES.length} 个阶段`;
+}
+
+// ---------- 动画控制 ----------
+let animFrame = null;
+let lastTime = 0;
+const ANIM_DURATION = 2500; // 每阶段动画时长(ms)
+
+function animate(time) {
+  if (!lastTime) lastTime = time;
+  const dt = time - lastTime;
+  lastTime = time;
+
+  if (playing) {
+    animProgress += (dt / ANIM_DURATION) * speeds[speedIndex];
+
+    if (animProgress >= 1) {
+      animProgress = 0;
+      if (currentStage < STAGES.length - 1) {
+        currentStage++;
+      } else {
+        playing = false;
+        document.getElementById('btn-play').textContent = '▶ 播放';
+        document.getElementById('btn-play').classList.remove('active');
+      }
+    }
+  }
+
+  render();
+  updateUI();
+  animFrame = requestAnimationFrame(animate);
+}
+
+// ---------- 事件绑定 ----------
+document.getElementById('btn-next').addEventListener('click', () => {
+  playing = false;
+  document.getElementById('btn-play').textContent = '▶ 播放';
+  document.getElementById('btn-play').classList.remove('active');
+  if (animProgress < 0.5) {
+    animProgress = 1;
+  } else if (currentStage < STAGES.length - 1) {
+    currentStage++;
+    animProgress = 0;
+  }
+});
+
+document.getElementById('btn-prev').addEventListener('click', () => {
+  playing = false;
+  document.getElementById('btn-play').textContent = '▶ 播放';
+  document.getElementById('btn-play').classList.remove('active');
+  if (animProgress > 0.3) {
+    animProgress = 0;
+  } else if (currentStage > 0) {
+    currentStage--;
+    animProgress = 0;
+  }
+});
+
+document.getElementById('btn-play').addEventListener('click', function() {
+  playing = !playing;
+  this.textContent = playing ? '⏸ 暂停' : '▶ 播放';
+  this.classList.toggle('active', playing);
+  if (playing && currentStage >= STAGES.length - 1 && animProgress >= 1) {
+    currentStage = 0;
+    animProgress = 0;
+  }
+});
+
+document.getElementById('btn-reset').addEventListener('click', () => {
+  playing = false;
+  currentStage = 0;
+  animProgress = 0;
+  document.getElementById('btn-play').textContent = '▶ 播放';
+  document.getElementById('btn-play').classList.remove('active');
+});
+
+document.getElementById('btn-speed').addEventListener('click', function() {
+  speedIndex = (speedIndex + 1) % speeds.length;
+  this.textContent = `速度: ${SPEED_LABELS[speedIndex]}`;
+});
+
+// 键盘快捷键
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'ArrowRight' || e.key === ' ') {
+    e.preventDefault();
+    if (e.key === ' ') {
+      document.getElementById('btn-play').click();
+    } else {
+      document.getElementById('btn-next').click();
+    }
+  } else if (e.key === 'ArrowLeft') {
+    document.getElementById('btn-prev').click();
+  } else if (e.key === 'r' || e.key === 'R') {
+    document.getElementById('btn-reset').click();
+  }
+});
+
+// ---------- 启动 ----------
+updateUI();
+requestAnimationFrame(animate);
+</script>
+</body>
+</html>
